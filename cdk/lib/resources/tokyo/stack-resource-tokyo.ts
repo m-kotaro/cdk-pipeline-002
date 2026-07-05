@@ -2,21 +2,20 @@ import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as sqs from "aws-cdk-lib/aws-sqs";
-import { config, StageName } from "../../pipeline/config";
+import { projectName } from "../../pipeline/env";
 
 export interface TokyoResourceStackProps extends cdk.StackProps {
-  stageName: StageName;
+  envName: string;
 }
 
 export class TokyoResourceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: TokyoResourceStackProps) {
     super(scope, id, props);
 
-    const pj = config.projectName;
-    const { stageName } = props;
+    const { envName } = props;
 
     new s3.Bucket(this, "SampleBucket", {
-      bucketName: `s3-${pj}-${stageName}-sample`,
+      bucketName: `s3-${projectName}-${envName}-sample`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -24,7 +23,7 @@ export class TokyoResourceStack extends cdk.Stack {
     });
 
     new sqs.Queue(this, "SampleQueue", {
-      queueName: `sqs-${pj}-${stageName}-sample`,
+      queueName: `sqs-${projectName}-${envName}-sample`,
       retentionPeriod: cdk.Duration.days(4),
     });
   }
