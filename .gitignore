@@ -1,0 +1,28 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript build output (cdk directory only)
+cdk/**/*.js
+cdk/**/*.d.ts
+cdk/**/*.js.map
+
+# CDK
+cdk.out/
+cdk/cdk.out/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.*

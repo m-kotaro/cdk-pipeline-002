@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cp001</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      color: #1e293b;
+    }
+    .card {
+      text-align: center;
+      padding: 3rem 4rem;
+      border-radius: 1rem;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      background: #eef2ff;
+      color: #4f46e5;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+    }
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(to right, #4f46e5, #7c3aed);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p {
+      color: #64748b;
+      font-size: 1.1rem;
+      line-height: 1.6;
+    }
+    .stack {
+      margin-top: 2rem;
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .stack span {
+      padding: 0.4rem 0.8rem;
+      border-radius: 0.5rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: #f8fafc;
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      }
+      .badge {
+        background: rgba(99, 102, 241, 0.2);
+        color: #a5b4fc;
+      }
+      h1 {
+        background: linear-gradient(to right, #818cf8, #c084fc);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      p { color: #94a3b8; }
+      .stack span {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #cbd5e1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">CDK Pipeline</div>
+    <h1>cp001</h1>
+    <p>S3 + CloudFront Static Site</p>
+    <div class="stack">
+      <span>S3</span>
+      <span>CloudFront</span>
+      <span>CodePipeline</span>
+      <span>Route 53</span>
+      <span>ACM</span>
+    </div>
+  </div>
+</body>
+</html>
