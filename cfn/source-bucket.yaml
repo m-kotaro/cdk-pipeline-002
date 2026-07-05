@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: S3 Source Bucket for CodePipeline (EventBridge trigger)
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: cp002
+
+Resources:
+  SourceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub s3-${ProjectName}-source
+      VersioningConfiguration:
+        Status: Enabled
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+Outputs:
+  BucketName:
+    Description: Source bucket name
+    Value: !Ref SourceBucket
+    Export:
+      Name: !Sub ${ProjectName}-source-bucket-name
+  BucketArn:
+    Description: Source bucket ARN
+    Value: !GetAtt SourceBucket.Arn
+    Export:
+      Name: !Sub ${ProjectName}-source-bucket-arn

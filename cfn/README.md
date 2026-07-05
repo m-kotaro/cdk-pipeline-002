@@ -1,69 +1,70 @@
 # CloudFormation Templates
 
-CDK Pipeline で利用する事前リソースを管理する。
+CDK Pipelines で利用する事前リソースを管理する。
 
-## codeconnection.yaml
+## source-bucket.yaml
 
-GitHub との CodeConnection を作成する。デプロイ後に AWS Console で手動承認が必要。
+CDK Pipelines のソースとなる S3 バケットを作成する。EventBridge 通知を有効にしてパイプラインをトリガーする。
 
 ### Parameters
 
 | Name | Description | Default |
 |------|-------------|---------|
-| ProjectName | プロジェクト名 | cp001 |
+| ProjectName | プロジェクト名 | cp002 |
 
 ### デプロイ
 
 ```bash
-export PROJECT_NAME=cp001
+export PROJECT_NAME=cp002
 
-aws cloudformation create-stack \
-  --stack-name stack-${PROJECT_NAME}-codeconnection \
-  --template-body file://cfn/codeconnection.yaml \
-  --parameters \
-    ParameterKey=ProjectName,ParameterValue=${PROJECT_NAME}
+aws cloudformation deploy \
+  --stack-name stack-${PROJECT_NAME}-source-bucket \
+  --template-file cfn/source-bucket.yaml \
+  --parameter-overrides \
+    ProjectName=${PROJECT_NAME}
 ```
-
-### デプロイ後の手順
-
-1. AWS Console → CodePipeline → 設定 → 接続 を開く
-2. 作成された接続（`codeconnection-dev-cdk-pipeline-001-github`）を選択
-3. 「保留中の接続を更新」から GitHub OAuth 認証を完了する
-4. ステータスが `Available` になれば OK
 
 ---
 
-## hostedzone.yaml
+## parameter-store.yaml
 
-環境ごとのサブドメインホストゾーンを作成する（`dev.example.com` / `prd.example.com`）。
+デプロイ先アカウント情報を Parameter Store に保存する。環境ごとに実行する。
 
 ### Parameters
 
 | Name | Description | Default |
 |------|-------------|---------|
+| ProjectName | プロジェクト名 | cp002 |
 | Env | 環境コード (dev / prd) | - |
-| DomainName | ルートドメイン名 | - |
-| ProjectName | プロジェクト名 | cp001 |
+| TargetAccountId | デプロイ先 AWS アカウント ID | - |
+| TargetRegion | デプロイ先リージョン | ap-northeast-1 |
 
 ### デプロイ
 
-```bash
-export ENV=[dev|prd]
-export PROJECT_NAME=cp001
-export DOMAIN_NAME=example.com
+dev 環境:
 
-aws cloudformation create-stack \
-  --stack-name stack-${PROJECT_NAME}-${ENV}-hostedzone \
-  --template-body file://cfn/hostedzone.yaml \
-  --parameters \
-    ParameterKey=Env,ParameterValue=${ENV} \
-    ParameterKey=DomainName,ParameterValue=${DOMAIN_NAME} \
-    ParameterKey=ProjectName,ParameterValue=${PROJECT_NAME}
+```bash
+export PROJECT_NAME=cp002
+
+aws cloudformation deploy \
+  --stack-name stack-${PROJECT_NAME}-param-dev \
+  --template-file cfn/parameter-store.yaml \
+  --parameter-overrides \
+    ProjectName=${PROJECT_NAME} \
+    Env=dev \
+    TargetAccountId=123456789012 \
+    TargetRegion=ap-northeast-1
 ```
 
-### デプロイ後の手順
+prd 環境:
 
-1. スタック出力の `NameServers` を確認する
-2. 親ゾーン（ルートドメインのレジストラ or 親ホストゾーン）に NS レコードを設定する
-   - `dev.example.com` → 出力された4つの NS レコード
-   - `prd.example.com` → 出力された4つの NS レコード
+```bash
+aws cloudformation deploy \
+  --stack-name stack-${PROJECT_NAME}-param-prd \
+  --template-file cfn/parameter-store.yaml \
+  --parameter-overrides \
+    ProjectName=${PROJECT_NAME} \
+    Env=prd \
+    TargetAccountId=987654321098 \
+    TargetRegion=ap-northeast-1
+```
