@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: SSM Parameter Store for target account configuration
+Description: SSM Parameter Store for account configuration
 
 Parameters:
   ProjectName:
@@ -7,36 +7,35 @@ Parameters:
     Default: cp002
   Env:
     Type: String
-    AllowedValues:
-      - dev
-      - prd
+    Description: "Environment code (e.g. dev, stg, prd)"
+  PipelineAccountId:
+    Type: String
+    Description: "Pipeline Account ID (account where CDK Pipelines is deployed)"
   TargetAccountId:
     Type: String
-  TargetRegion:
-    Type: String
-    Default: ap-northeast-1
+    Description: "Target Account ID (account where resources are deployed)"
 
 Resources:
-  AccountIdParameter:
+  PipelineAccountIdParameter:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: !Sub /${ProjectName}/${Env}/account-id
+      Name: !Sub /${ProjectName}/${Env}/pipeline-account-id
+      Type: String
+      Value: !Ref PipelineAccountId
+      Description: !Sub "Pipeline account ID for ${Env} environment"
+
+  TargetAccountIdParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${ProjectName}/${Env}/target-account-id
       Type: String
       Value: !Ref TargetAccountId
       Description: !Sub "Target account ID for ${Env} environment"
 
-  RegionParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /${ProjectName}/${Env}/region
-      Type: String
-      Value: !Ref TargetRegion
-      Description: !Sub "Target region for ${Env} environment"
-
 Outputs:
-  AccountIdParameterName:
-    Description: Account ID parameter name
-    Value: !Ref AccountIdParameter
-  RegionParameterName:
-    Description: Region parameter name
-    Value: !Ref RegionParameter
+  PipelineAccountIdParameterName:
+    Description: Pipeline Account ID parameter name
+    Value: !Ref PipelineAccountIdParameter
+  TargetAccountIdParameterName:
+    Description: Target Account ID parameter name
+    Value: !Ref TargetAccountIdParameter
