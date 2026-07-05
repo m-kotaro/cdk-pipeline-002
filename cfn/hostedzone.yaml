@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Route 53 Hosted Zone for subdomain (e.g. dev.example.com, prd.example.com)
+
+Parameters:
+  Env:
+    Type: String
+    AllowedValues:
+      - dev
+      - prd
+  DomainName:
+    Type: String
+    Description: Root domain name (e.g. example.com)
+  ProjectName:
+    Type: String
+    Default: cp001
+
+Resources:
+  HostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name: !Sub ${Env}.${DomainName}
+      HostedZoneConfig:
+        Comment: !Sub "${Env}.${DomainName} - ${ProjectName}"
+
+Outputs:
+  HostedZoneId:
+    Description: Hosted Zone ID
+    Value: !Ref HostedZone
+    Export:
+      Name: !Sub ${ProjectName}-${Env}-hostedzone-id
+  DomainName:
+    Description: Subdomain name
+    Value: !Sub ${Env}.${DomainName}
+  NameServers:
+    Description: NS records to configure at parent zone
+    Value: !Join [", ", !GetAtt HostedZone.NameServers]

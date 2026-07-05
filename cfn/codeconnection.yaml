@@ -1,0 +1,21 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CodeConnection for GitHub (requires manual approval in Console after deploy)
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: cp001
+
+Resources:
+  GitHubConnection:
+    Type: AWS::CodeConnections::Connection
+    Properties:
+      ConnectionName: !Sub codeconnection-${ProjectName}-github
+      ProviderType: GitHub
+
+Outputs:
+  ConnectionArn:
+    Description: GitHub CodeConnection ARN
+    Value: !GetAtt GitHubConnection.ConnectionArn
+    Export:
+      Name: !Sub ${ProjectName}-codeconnection-arn
