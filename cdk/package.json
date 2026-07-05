@@ -1,8 +1,8 @@
 {
-  "name": "cdk-pipeline-001",
+  "name": "cdk-pipeline-002",
   "version": "1.0.0",
   "bin": {
-    "cdk-pipeline-001": "bin/app.js"
+    "cdk-pipeline-002": "bin/pipeline-app.js"
   },
   "scripts": {
     "build": "tsc",
