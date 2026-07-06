@@ -1,8 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
-import { TokyoResourceStack } from "../resources/tokyo/stack-resource-tokyo";
-import { OsakaResourceStack } from "../resources/osaka/stack-resource-osaka";
-import { projectName } from "./env";
+import { deployTokyo } from "../resources/tokyo/deploy-tokyo";
+import { deployOsaka } from "../resources/osaka/deploy-osaka";
 
 export interface AppStageProps extends cdk.StageProps {
   envName: string;
@@ -14,22 +13,16 @@ export class AppStage extends cdk.Stage {
   constructor(scope: Construct, id: string, props: AppStageProps) {
     super(scope, id, props);
 
-    const { envName, regionName, accountCode } = props;
+    const deployProps = {
+      env: props.env,
+      envName: props.envName,
+      accountCode: props.accountCode,
+    };
 
-    if (regionName === "tokyo") {
-      new TokyoResourceStack(this, `stack-${projectName}-${envName}-${accountCode}-tokyo`, {
-        env: props.env,
-        envName: envName,
-        accountCode: accountCode,
-        stackName: `stack-${projectName}-${envName}-${accountCode}-tokyo`,
-      });
-    } else if (regionName === "osaka") {
-      new OsakaResourceStack(this, `stack-${projectName}-${envName}-${accountCode}-osaka`, {
-        env: props.env,
-        envName: envName,
-        accountCode: accountCode,
-        stackName: `stack-${projectName}-${envName}-${accountCode}-osaka`,
-      });
+    if (props.regionName === "tokyo") {
+      deployTokyo(this, deployProps);
+    } else if (props.regionName === "osaka") {
+      deployOsaka(this, deployProps);
     }
   }
 }
