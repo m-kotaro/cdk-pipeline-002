@@ -6,16 +6,17 @@ import { projectName } from "../../pipeline/env";
 
 export interface TokyoResourceStackProps extends cdk.StackProps {
   envName: string;
+  accountCode: string;
 }
 
 export class TokyoResourceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: TokyoResourceStackProps) {
     super(scope, id, props);
 
-    const { envName } = props;
+    const { envName, accountCode } = props;
 
     new s3.Bucket(this, "SampleBucket", {
-      bucketName: `s3-${projectName}-${envName}-sample`,
+      bucketName: `s3-${projectName}-${envName}-${accountCode}-sample`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -23,7 +24,7 @@ export class TokyoResourceStack extends cdk.Stack {
     });
 
     new sqs.Queue(this, "SampleQueue", {
-      queueName: `sqs-${projectName}-${envName}-sample`,
+      queueName: `sqs-${projectName}-${envName}-${accountCode}-sample`,
       retentionPeriod: cdk.Duration.days(4),
     });
   }

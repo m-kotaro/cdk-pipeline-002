@@ -7,25 +7,28 @@ import { projectName } from "./env";
 export interface AppStageProps extends cdk.StageProps {
   envName: string;
   regionName: string;
+  accountCode: string;
 }
 
 export class AppStage extends cdk.Stage {
   constructor(scope: Construct, id: string, props: AppStageProps) {
     super(scope, id, props);
 
-    const { envName, regionName } = props;
+    const { envName, regionName, accountCode } = props;
 
     if (regionName === "tokyo") {
-      new TokyoResourceStack(this, `stack-${projectName}-${envName}-tokyo`, {
+      new TokyoResourceStack(this, `stack-${projectName}-${envName}-${accountCode}-tokyo`, {
         env: props.env,
         envName: envName,
-        stackName: `stack-${projectName}-${envName}-tokyo`,
+        accountCode: accountCode,
+        stackName: `stack-${projectName}-${envName}-${accountCode}-tokyo`,
       });
     } else if (regionName === "osaka") {
-      new OsakaResourceStack(this, `stack-${projectName}-${envName}-osaka`, {
+      new OsakaResourceStack(this, `stack-${projectName}-${envName}-${accountCode}-osaka`, {
         env: props.env,
         envName: envName,
-        stackName: `stack-${projectName}-${envName}-osaka`,
+        accountCode: accountCode,
+        stackName: `stack-${projectName}-${envName}-${accountCode}-osaka`,
       });
     }
   }
