@@ -31,11 +31,9 @@ export class PipelineStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // Parameter Store から Target Account 情報を取得
-    const targetAccountId = ssm.StringParameter.valueFromLookup(
-      this,
-      `${ssmPrefix}/target-account-id`
-    );
+    // Parameter Store から Target Account 情報を取得（環境変数がある場合はそちらを優先）
+    const targetAccountId = process.env.TARGET_ACCOUNT_ID 
+      || ssm.StringParameter.valueFromLookup(this, `${ssmPrefix}/target-account-id`);
 
     // クロスアカウント判定
     const isCrossAccount = this.account !== targetAccountId;
