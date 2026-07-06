@@ -20,6 +20,8 @@ import {
   ssmPrefix,
   sourceBucketName,
   artifactBucketName,
+  pipelineAccountCode,
+  targetAccountCode,
 } from "./env";
 
 export class PipelineStack extends cdk.Stack {
@@ -29,7 +31,7 @@ export class PipelineStack extends cdk.Stack {
     // Parameter Store から Target Account 情報を取得
     const targetAccountId = ssm.StringParameter.valueFromLookup(
       this,
-      `${ssmPrefix}/${deployEnv}/target-account-id`
+      `${ssmPrefix}/target-account-id`
     );
 
     // クロスアカウント判定
@@ -58,12 +60,17 @@ export class PipelineStack extends cdk.Stack {
 
     // CodePipeline
     const pipeline = new CodePipeline(this, "Pipeline", {
-      pipelineName: `cp-${projectName}-${deployEnv}-${deployRegion}-deploy`,
+      pipelineName: `cp-${projectName}-${deployEnv}-${pipelineAccountCode}-${deployRegion}-deploy`,
       crossAccountKeys: isCrossAccount,
       artifactBucket: artifactBucket,
       synth: new ShellStep("Synth", {
         input: source,
-        commands: ["cd cdk-pipeline-002-main/cdk", "npm ci", "npx cdk synth"],
+        commands: [
+          "cd cdk-pipeline-002-main/cdk",
+          "npm ci",
+          `export TARGET_ACCOUNT_CODE=${targetAccountCode}`,
+          "npx cdk synth",
+        ],
         primaryOutputDirectory: "cdk-pipeline-002-main/cdk/cdk.out",
       }),
     });
@@ -74,6 +81,7 @@ export class PipelineStack extends cdk.Stack {
         env: { account: targetAccountId, region: awsRegion },
         envName: deployEnv,
         regionName: deployRegion,
+        accountCode: targetAccountCode,
       })
     );
 
@@ -82,7 +90,7 @@ export class PipelineStack extends cdk.Stack {
 
     // EventBridge rule: S3 PutObject triggers pipeline
     new events.Rule(this, "S3TriggerRule", {
-      ruleName: `rule-${projectName}-${deployEnv}-${deployRegion}-s3-trigger`,
+      ruleName: `rule-${projectName}-${deployEnv}-${pipelineAccountCode}-${deployRegion}-s3-trigger`,
       eventPattern: {
         source: ["aws.s3"],
         detailType: ["Object Created"],
