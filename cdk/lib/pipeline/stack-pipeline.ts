@@ -22,6 +22,8 @@ import {
   artifactBucketName,
   pipelineAccountCode,
   targetAccountCode,
+  sourceObjectKey,
+  sourceExtractDir,
 } from "./env";
 
 export class PipelineStack extends cdk.Stack {
@@ -54,7 +56,7 @@ export class PipelineStack extends cdk.Stack {
     });
 
     // S3 ソース（EventBridge トリガー）
-    const source = CodePipelineSource.s3(sourceBucket, "cdk-pipeline-002-main.zip", {
+    const source = CodePipelineSource.s3(sourceBucket, sourceObjectKey, {
       trigger: S3Trigger.EVENTS,
     });
 
@@ -65,13 +67,19 @@ export class PipelineStack extends cdk.Stack {
       artifactBucket: artifactBucket,
       synth: new ShellStep("Synth", {
         input: source,
+        env: {
+          PROJECT_NAME: projectName,
+          DEPLOY_ENV: deployEnv,
+          DEPLOY_REGION: deployRegion,
+          PIPELINE_ACCOUNT_CODE: pipelineAccountCode,
+          TARGET_ACCOUNT_CODE: targetAccountCode,
+        },
         commands: [
-          "cd cdk-pipeline-002-main/cdk",
+          `cd ${sourceExtractDir}/cdk`,
           "npm ci",
-          `export TARGET_ACCOUNT_CODE=${targetAccountCode}`,
           "npx cdk synth",
         ],
-        primaryOutputDirectory: "cdk-pipeline-002-main/cdk/cdk.out",
+        primaryOutputDirectory: `${sourceExtractDir}/cdk/cdk.out`,
       }),
     });
 
@@ -99,7 +107,7 @@ export class PipelineStack extends cdk.Stack {
             name: [sourceBucketName],
           },
           object: {
-            key: ["cdk-pipeline-002-main.zip"],
+            key: [sourceObjectKey],
           },
         },
       },
