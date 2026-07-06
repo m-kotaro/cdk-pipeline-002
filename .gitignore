@@ -12,6 +12,7 @@ cdk/**/*.js.map
 # CDK
 cdk.out/
 cdk/cdk.out/
+cdk/cdk.context.json
 
 # OS files
 .DS_Store
