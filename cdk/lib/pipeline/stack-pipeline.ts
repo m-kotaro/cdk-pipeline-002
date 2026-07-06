@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as kms from "aws-cdk-lib/aws-kms";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
@@ -46,11 +47,23 @@ export class PipelineStack extends cdk.Stack {
       sourceBucketName
     );
 
+    // Artifact Bucket 用の KMS キー（クロスアカウント時に必要）
+    const artifactKey = isCrossAccount
+      ? new kms.Key(this, "ArtifactKey", {
+          alias: `alias/${projectName}-${deployEnv}-${pipelineAccountCode}-artifact`,
+          enableKeyRotation: true,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        })
+      : undefined;
+
     // Artifact Bucket（CDK で作成 - 権限が自動設定される）
     const artifactBucket = new s3.Bucket(this, "ArtifactBucket", {
       bucketName: artifactBucketName,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
+      encryption: isCrossAccount
+        ? s3.BucketEncryption.KMS
+        : s3.BucketEncryption.S3_MANAGED,
+      encryptionKey: artifactKey,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
