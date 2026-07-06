@@ -2,45 +2,43 @@
 
 ## Overview
 
-本プロジェクトは、AWS CDK Pipelines を使用したクロスアカウントデプロイのサンプル実装である。「1パイプライン＝1環境」のアーキテクチャを採用し、config の環境コード（env）を変更するだけで独立したパイプラインを環境ごとに作成できる。
+本プロジェクトは、AWS CDK Pipelines を使用したクロスアカウントデプロイのサンプル実装である。「1パイプライン＝1環境＝1リージョン」のアーキテクチャを採用し、環境変数を変更するだけで独立したパイプラインを環境ごとに作成できる。
 
-S3 バケットをソースとしたパイプライン実行により、Pipeline_Account から指定された Target_Account へリソースをデプロイする。各環境のパイプラインでは東京リージョン（ap-northeast-1）と大阪リージョン（ap-northeast-3）の両方にリソースをデプロイし、大阪リージョンは災害対策（DR）用として東京とは異なるリソース構成を持つ。
+S3 バケットをソースとしたパイプライン実行により、Pipeline_Account から指定された Target_Account へリソースをデプロイする。
 
 開発効率向上のため、パイプライン経由（Pipeline_Deploy）と `cdk deploy` コマンドによる直接デプロイ（Direct_Deploy）の2つのエントリポイントを提供する。
 
-デプロイ先アカウント情報は Pipeline_Account の AWS Systems Manager Parameter Store で一元管理し、両方のデプロイパスから同一のパラメータを参照する設計とする。
+デプロイ先アカウント情報は Pipeline_Account の AWS Systems Manager Parameter Store で一元管理する。
 
 ## Architecture
 
-### 全体アーキテクチャ図（1パイプライン＝1環境）
+### 全体アーキテクチャ図
 
 ```mermaid
 graph TB
     subgraph Pipeline_Account["Pipeline_Account（管理アカウント）"]
-        S3Source["S3 Source Bucket<br/>s3-{pj}-{env}-source"]
-        S3Artifact["S3 Artifact Bucket<br/>s3-{pj}-{env}-artifact"]
-        SSM["Parameter Store<br/>/{pj}/{env}/account-id<br/>/{pj}/{env}/region"]
-        CP["CodePipeline<br/>cp-{pj}-{env}-deploy"]
+        S3Source["S3 Source Bucket<br/>s3-{pj}-{env}-{pipelineCode}-{region}-source"]
+        S3Artifact["S3 Artifact Bucket<br/>s3-{pj}-{env}-{pipelineCode}-{region}-artifact"]
+        KMS["KMS Key<br/>(クロスアカウント時のみ)"]
+        SSM["Parameter Store<br/>/{pj}/{env}/{pipelineCode}/target-account-id"]
+        CP["CodePipeline<br/>cp-{pj}-{env}-{pipelineCode}-{region}-deploy"]
         Synth["Synth Step<br/>npm ci → cdk synth"]
         Deploy["Deploy Stage"]
     end
 
     subgraph Target_Account["Target_Account（対象環境）"]
         subgraph Tokyo["ap-northeast-1（東京）"]
-            S3Sample["S3 Bucket<br/>s3-{pj}-{env}-sample"]
-            SQSSample["SQS Queue<br/>sqs-{pj}-{env}-sample"]
-        end
-        subgraph Osaka["ap-northeast-3（大阪 / DR）"]
-            DrS3["S3 Bucket<br/>s3-{pj}-{env}-dr"]
+            S3Sample["S3 Bucket<br/>s3-{pj}-{env}-{targetCode}-sample"]
+            SQSSample["SQS Queue<br/>sqs-{pj}-{env}-{targetCode}-sample"]
         end
     end
 
-    S3Source -->|"アーティファクト<br/>アップロード"| CP
+    S3Source -->|"zip アップロード"| CP
     CP --> Synth
     Synth --> Deploy
     Deploy -->|"cross-account deploy"| Tokyo
-    Deploy -->|"cross-account deploy"| Osaka
     SSM -.->|"参照"| CP
+    KMS -.->|"暗号化"| S3Artifact
 ```
 
 ### 2つのデプロイパス
@@ -50,51 +48,45 @@ graph LR
     subgraph Pipeline_Deploy["Pipeline_Deploy（S3ソース経由）"]
         direction TB
         PA1["pipeline-app.ts"]
-        PS["Pipeline_Stack"]
-        AS1["App_Stage(Deploy)"]
-        TK1["Tokyo_Stack"]
-        OS1["Osaka_Stack"]
+        PS["PipelineStack"]
+        AS1["AppStage"]
+        DT1["deployTokyo()"]
 
         PA1 --> PS
         PS --> AS1
-        AS1 --> TK1
-        AS1 --> OS1
+        AS1 --> DT1
     end
 
     subgraph Direct_Deploy["Direct_Deploy（cdk deploy 経由）"]
         direction TB
         DA["direct-app.ts"]
-        TK2["Tokyo_Stack"]
-        OS2["Osaka_Stack"]
+        DT2["deployTokyo()"]
 
-        DA --> TK2
-        DA --> OS2
+        DA --> DT2
     end
 
-    subgraph SSM["Parameter Store"]
-        P1["/{pj}/{env}/account-id"]
-        P2["/{pj}/{env}/region"]
+    subgraph Shared["共通デプロイ関数"]
+        DTF["deploy-tokyo.ts"]
+        DOF["deploy-osaka.ts"]
     end
 
-    PS -.->|"参照"| SSM
-    DA -.->|"参照"| SSM
+    DT1 --> DTF
+    DT2 --> DTF
 ```
 
-### 環境ごとのパイプライン作成
+### 環境変数による切り替え
 
 ```mermaid
 graph TD
-    Config["config.ts<br/>env = 'dev'"]
-    ConfigPrd["config.ts<br/>env = 'prd'"]
+    EnvDev["DEPLOY_ENV=dev<br/>TARGET_ACCOUNT_CODE=alfa"]
+    EnvPrd["DEPLOY_ENV=prd<br/>TARGET_ACCOUNT_CODE=beta"]
 
-    Config --> DevPipeline["stack-cp002-dev-pipeline<br/>cp-cp002-dev-deploy"]
-    ConfigPrd --> PrdPipeline["stack-cp002-prd-pipeline<br/>cp-cp002-prd-deploy"]
+    EnvDev --> DevPipeline["stack-cp002-dev-base-tokyo-pipeline"]
+    EnvPrd --> PrdPipeline["stack-cp002-prd-base-tokyo-pipeline"]
 
-    DevPipeline --> DevTarget["Dev Target_Account"]
-    PrdPipeline --> PrdTarget["Prd Target_Account"]
+    DevPipeline --> DevTarget["stack-cp002-dev-alfa-tokyo"]
+    PrdPipeline --> PrdTarget["stack-cp002-prd-beta-tokyo"]
 ```
-
-config.env の値を変更してデプロイするだけで、環境ごとに完全に独立したパイプラインが作成される。
 
 ## Components and Interfaces
 
@@ -106,40 +98,51 @@ cdk/
 │   ├── pipeline-app.ts        # Pipeline_Deploy エントリポイント
 │   └── direct-app.ts          # Direct_Deploy エントリポイント
 ├── lib/
-│   ├── pipeline/              # パイプライン基盤（初期構築後ほぼ変更しない）
-│   │   ├── config.ts          # プロジェクト設定（集中管理）
-│   │   ├── stack-pipeline.ts  # Pipeline_Stack 定義
-│   │   └── stage-app.ts       # App_Stage 定義
-│   └── resources/             # デプロイ対象リソース（開発者が日常的に追加・修正）
-│       ├── tokyo/             # 東京リージョン用リソース
+│   ├── pipeline/
+│   │   ├── env.ts             # 環境変数の集中管理
+│   │   ├── stack-pipeline.ts  # PipelineStack 定義
+│   │   └── stage-app.ts       # AppStage 定義
+│   └── resources/
+│       ├── tokyo/
+│       │   ├── deploy-tokyo.ts        # 東京デプロイ関数
 │       │   └── stack-resource-tokyo.ts
-│       └── osaka/             # 大阪リージョン（DR）用リソース
+│       └── osaka/
+│           ├── deploy-osaka.ts        # 大阪デプロイ関数
 │           └── stack-resource-osaka.ts
-├── cdk.json
-├── package.json
-└── tsconfig.json
+cfn/
+├── pipeline-buckets.yaml      # S3 Source Bucket
+├── parameter-store.yaml       # SSM Parameter Store
+└── README.md
 ```
 
 ### コンポーネント詳細
 
-#### 1. config.ts（設定の集中管理）
+#### 1. env.ts（環境変数の集中管理）
 
 ```typescript
-export const config = {
-  projectName: "cp002",
-  env: "dev",  // 環境コード: この値を変えることで別環境用のパイプラインが作れる
-  region: "ap-northeast-1",
-  drRegion: "ap-northeast-3",
-  accounts: {
-    pipeline: { id: "PIPELINE_ACCOUNT_ID", alias: "pipeline" },
-    target: { id: "TARGET_ACCOUNT_ID", alias: "target" },
-  },
-  sourceBucket: { name: "s3-cp002-dev-source" },
-  artifactBucket: { name: "s3-cp002-dev-artifact" },
-  parameterStore: { prefix: "/cp002" },
-} as const;
+// Region name to AWS region mapping
+const REGION_MAP: Record<string, string> = {
+  tokyo: "ap-northeast-1",
+  osaka: "ap-northeast-3",
+};
 
-export type EnvName = typeof config.env;
+// Environment variables
+export const projectName = process.env.PROJECT_NAME || "cp002";
+export const deployEnv = process.env.DEPLOY_ENV || "dev";
+export const deployRegion = process.env.DEPLOY_REGION || "tokyo";
+export const awsRegion = REGION_MAP[deployRegion] || "ap-northeast-1";
+export const cdkDefaultAccount = process.env.CDK_DEFAULT_ACCOUNT;
+
+// Account codes (free-form: base, alfa, beta, etc.)
+export const pipelineAccountCode = process.env.PIPELINE_ACCOUNT_CODE || "base";
+export const targetAccountCode = process.env.TARGET_ACCOUNT_CODE || "alfa";
+
+// Derived values
+export const ssmPrefix = `/${projectName}/${deployEnv}/${pipelineAccountCode}`;
+export const sourceBucketName = `s3-${projectName}-${deployEnv}-${pipelineAccountCode}-${deployRegion}-source`;
+export const artifactBucketName = `s3-${projectName}-${deployEnv}-${pipelineAccountCode}-${deployRegion}-artifact`;
+export const sourceObjectKey = "cdk-pipeline-002-main.zip";
+export const sourceExtractDir = "cdk-pipeline-002-main";
 ```
 
 #### 2. pipeline-app.ts（Pipeline_Deploy エントリポイント）
@@ -148,15 +151,16 @@ export type EnvName = typeof config.env;
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib";
 import { PipelineStack } from "../lib/pipeline/stack-pipeline";
-import { config } from "../lib/pipeline/config";
+import { projectName, deployEnv, deployRegion, awsRegion, pipelineAccountCode } from "../lib/pipeline/env";
 
 const app = new cdk.App();
 
-new PipelineStack(app, `stack-${config.projectName}-${config.env}-pipeline`, {
+new PipelineStack(app, `stack-${projectName}-${deployEnv}-${pipelineAccountCode}-${deployRegion}-pipeline`, {
   env: {
-    account: process.env.CDK_DEFAULT_ACCOUNT || config.accounts.pipeline.id,
-    region: config.region,
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: awsRegion,
   },
+  stackName: `stack-${projectName}-${deployEnv}-${pipelineAccountCode}-${deployRegion}-pipeline`,
 });
 
 app.synth();
@@ -167,242 +171,173 @@ app.synth();
 ```typescript
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib";
-import * as ssm from "aws-cdk-lib/aws-ssm";
-import { TokyoResourceStack } from "../lib/resources/tokyo/stack-resource-tokyo";
-import { OsakaResourceStack } from "../lib/resources/osaka/stack-resource-osaka";
-import { config } from "../lib/pipeline/config";
+import { deployTokyo } from "../lib/resources/tokyo/deploy-tokyo";
+import { deployOsaka } from "../lib/resources/osaka/deploy-osaka";
+import { deployEnv, deployRegion, awsRegion, cdkDefaultAccount, targetAccountCode } from "../lib/pipeline/env";
 
 const app = new cdk.App();
-const envName = config.env;
 
-const targetAccountId = ssm.StringParameter.valueFromLookup(
-  app, `${config.parameterStore.prefix}/${envName}/account-id`
-);
-const targetRegion = ssm.StringParameter.valueFromLookup(
-  app, `${config.parameterStore.prefix}/${envName}/region`
-);
+const deployProps = {
+  env: {
+    account: cdkDefaultAccount,
+    region: awsRegion,
+  },
+  envName: deployEnv,
+  accountCode: targetAccountCode,
+};
 
-new TokyoResourceStack(app, `stack-${config.projectName}-${envName}-tokyo`, {
-  env: { account: targetAccountId, region: targetRegion },
-  envName: envName,
-  stackName: `stack-${config.projectName}-${envName}-tokyo`,
-});
-
-new OsakaResourceStack(app, `stack-${config.projectName}-${envName}-osaka`, {
-  env: { account: targetAccountId, region: config.drRegion },
-  envName: envName,
-  stackName: `stack-${config.projectName}-${envName}-osaka`,
-});
+if (deployRegion === "tokyo") {
+  deployTokyo(app, deployProps);
+} else if (deployRegion === "osaka") {
+  deployOsaka(app, deployProps);
+}
 
 app.synth();
 ```
 
-#### 4. stack-pipeline.ts（Pipeline_Stack）
+#### 4. stack-pipeline.ts（PipelineStack）
+
+主要なポイント:
+- Parameter Store から Target Account ID を取得（環境変数がある場合は優先）
+- クロスアカウント判定に基づき KMS キーを作成
+- Synth Step で環境変数を渡し、CodeBuild 内での SSM 参照を回避
+- EventBridge Rule で S3 アップロードをトリガー
 
 ```typescript
-import * as cdk from "aws-cdk-lib";
-import { Construct } from "constructs";
-import * as s3 from "aws-cdk-lib/aws-s3";
-import * as ssm from "aws-cdk-lib/aws-ssm";
-import { CodePipeline, CodePipelineSource, ShellStep } from "aws-cdk-lib/pipelines";
-import { S3Trigger } from "aws-cdk-lib/aws-codepipeline-actions";
-import { AppStage } from "./stage-app";
-import { config } from "./config";
+// Parameter Store から Target Account 情報を取得（環境変数がある場合はそちらを優先）
+const targetAccountId = process.env.TARGET_ACCOUNT_ID 
+  || ssm.StringParameter.valueFromLookup(this, `${ssmPrefix}/target-account-id`);
 
-export class PipelineStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
-    super(scope, id, props);
+// クロスアカウント判定
+const isCrossAccount = this.account !== targetAccountId;
 
-    const pj = config.projectName;
-    const env = config.env;
+// Artifact Bucket 用の KMS キー（クロスアカウント時に必要）
+const artifactKey = isCrossAccount
+  ? new kms.Key(this, "ArtifactKey", { ... })
+  : undefined;
 
-    const sourceBucket = s3.Bucket.fromBucketName(this, "SourceBucket", config.sourceBucket.name);
-    const artifactBucket = s3.Bucket.fromBucketName(this, "ArtifactBucket", config.artifactBucket.name);
-
-    const source = CodePipelineSource.s3(sourceBucket, "source.zip", {
-      trigger: S3Trigger.EVENTS,
-    });
-
-    const pipeline = new CodePipeline(this, "Pipeline", {
-      pipelineName: `cp-${pj}-${env}-deploy`,
-      crossAccountKeys: true,
-      artifactBucket: artifactBucket,
-      synth: new ShellStep("Synth", {
-        input: source,
-        commands: ["cd cdk", "npm ci", "npx cdk synth"],
-        primaryOutputDirectory: "cdk/cdk.out",
-      }),
-    });
-
-    const targetAccountId = ssm.StringParameter.valueFromLookup(
-      this, `${config.parameterStore.prefix}/${env}/account-id`
-    );
-    const targetRegion = ssm.StringParameter.valueFromLookup(
-      this, `${config.parameterStore.prefix}/${env}/region`
-    );
-
-    pipeline.addStage(
-      new AppStage(this, "Deploy", {
-        env: { account: targetAccountId, region: targetRegion },
-        envName: env,
-      })
-    );
-  }
-}
+// CodePipeline
+const pipeline = new CodePipeline(this, "Pipeline", {
+  crossAccountKeys: isCrossAccount,
+  synth: new ShellStep("Synth", {
+    env: {
+      PROJECT_NAME: projectName,
+      DEPLOY_ENV: deployEnv,
+      DEPLOY_REGION: deployRegion,
+      PIPELINE_ACCOUNT_CODE: pipelineAccountCode,
+      TARGET_ACCOUNT_CODE: targetAccountCode,
+      TARGET_ACCOUNT_ID: targetAccountId,
+    },
+    commands: [...],
+  }),
+});
 ```
 
-#### 5. stage-app.ts（App_Stage）
+#### 5. stage-app.ts（AppStage）
 
 ```typescript
-import * as cdk from "aws-cdk-lib";
-import { Construct } from "constructs";
-import { TokyoResourceStack } from "../resources/tokyo/stack-resource-tokyo";
-import { OsakaResourceStack } from "../resources/osaka/stack-resource-osaka";
-import { config } from "./config";
-
-export interface AppStageProps extends cdk.StageProps {
-  envName: string;
-}
-
 export class AppStage extends cdk.Stage {
   constructor(scope: Construct, id: string, props: AppStageProps) {
     super(scope, id, props);
 
-    const pj = config.projectName;
-    const { envName } = props;
+    const deployProps = {
+      env: props.env,
+      envName: props.envName,
+      accountCode: props.accountCode,
+    };
 
-    new TokyoResourceStack(this, `stack-${pj}-${envName}-tokyo`, {
-      env: { account: props.env?.account, region: config.region },
-      envName: envName,
-      stackName: `stack-${pj}-${envName}-tokyo`,
-    });
-
-    new OsakaResourceStack(this, `stack-${pj}-${envName}-osaka`, {
-      env: { account: props.env?.account, region: config.drRegion },
-      envName: envName,
-      stackName: `stack-${pj}-${envName}-osaka`,
-    });
+    if (props.regionName === "tokyo") {
+      deployTokyo(this, deployProps);
+    } else if (props.regionName === "osaka") {
+      deployOsaka(this, deployProps);
+    }
   }
 }
 ```
 
-#### 6. stack-resource-tokyo.ts（Tokyo_Stack）
+#### 6. deploy-tokyo.ts / deploy-osaka.ts（共通デプロイ関数）
 
 ```typescript
-import * as cdk from "aws-cdk-lib";
-import { Construct } from "constructs";
-import * as s3 from "aws-cdk-lib/aws-s3";
-import * as sqs from "aws-cdk-lib/aws-sqs";
-import { config } from "../../pipeline/config";
-
-export interface TokyoResourceStackProps extends cdk.StackProps {
-  envName: string;
-}
-
-export class TokyoResourceStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props: TokyoResourceStackProps) {
-    super(scope, id, props);
-    const pj = config.projectName;
-    const { envName } = props;
-
-    new s3.Bucket(this, "SampleBucket", {
-      bucketName: `s3-${pj}-${envName}-sample`,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: true,
-    });
-
-    new sqs.Queue(this, "SampleQueue", {
-      queueName: `sqs-${pj}-${envName}-sample`,
-      retentionPeriod: cdk.Duration.days(4),
-    });
-  }
-}
-```
-
-#### 7. stack-resource-osaka.ts（Osaka_Stack / DR）
-
-```typescript
-import * as cdk from "aws-cdk-lib";
-import { Construct } from "constructs";
-import * as s3 from "aws-cdk-lib/aws-s3";
-import { config } from "../../pipeline/config";
-
-export interface OsakaResourceStackProps extends cdk.StackProps {
-  envName: string;
-}
-
-export class OsakaResourceStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props: OsakaResourceStackProps) {
-    super(scope, id, props);
-    const pj = config.projectName;
-    const { envName } = props;
-
-    new s3.Bucket(this, "DrBucket", {
-      bucketName: `s3-${pj}-${envName}-dr`,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      versioned: true,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      lifecycleRules: [
-        { noncurrentVersionExpiration: cdk.Duration.days(90) },
-      ],
-    });
-  }
+export function deployTokyo(scope: Construct, props: DeployProps): void {
+  new TokyoResourceStack(scope, `stack-${projectName}-${props.envName}-${props.accountCode}-tokyo`, {
+    env: props.env,
+    envName: props.envName,
+    accountCode: props.accountCode,
+    stackName: `stack-${projectName}-${props.envName}-${props.accountCode}-tokyo`,
+  });
 }
 ```
 
 ## Data Models
 
-### 設定データ構造
+### 環境変数
 
-```typescript
-interface Config {
-  readonly projectName: string;
-  readonly env: string;
-  readonly region: string;
-  readonly drRegion: string;
-  readonly accounts: {
-    readonly pipeline: { readonly id: string; readonly alias: string };
-    readonly target: { readonly id: string; readonly alias: string };
-  };
-  readonly sourceBucket: { readonly name: string };
-  readonly artifactBucket: { readonly name: string };
-  readonly parameterStore: { readonly prefix: string };
-}
-```
+| 変数名 | 説明 | デフォルト |
+|--------|------|----------|
+| `PROJECT_NAME` | プロジェクト名 | cp002 |
+| `DEPLOY_ENV` | 環境コード | dev |
+| `DEPLOY_REGION` | リージョン名 | tokyo |
+| `PIPELINE_ACCOUNT_CODE` | パイプラインアカウントコード | base |
+| `TARGET_ACCOUNT_CODE` | ターゲットアカウントコード | alfa |
+| `CDK_DEFAULT_ACCOUNT` | AWS アカウント ID | - |
+| `TARGET_ACCOUNT_ID` | ターゲットアカウント ID（CodeBuild 用） | - |
 
 ### Parameter Store パラメータ構造
 
 | パラメータ名 | 説明 | 例 |
-|---|---|---|
-| `/{pj}/{env}/account-id` | 対象環境のアカウント ID | `123456789012` |
-| `/{pj}/{env}/region` | 対象環境のリージョン | `ap-northeast-1` |
+|-------------|------|-----|
+| `/{pj}/{env}/{accountCode}/pipeline-account-id` | パイプラインアカウント ID | `111111111111` |
+| `/{pj}/{env}/{accountCode}/target-account-id` | ターゲットアカウント ID | `222222222222` |
+
+### 命名規則
+
+| リソース種別 | パターン |
+|-------------|---------|
+| Pipeline Stack | `stack-{pj}-{env}-{pipelineCode}-{region}-pipeline` |
+| CodePipeline | `cp-{pj}-{env}-{pipelineCode}-{region}-deploy` |
+| Source Bucket | `s3-{pj}-{env}-{pipelineCode}-{region}-source` |
+| Artifact Bucket | `s3-{pj}-{env}-{pipelineCode}-{region}-artifact` |
+| Resource Stack | `stack-{pj}-{env}-{targetCode}-{region}` |
+| Sample S3 | `s3-{pj}-{env}-{targetCode}-sample` |
+| Sample SQS | `sqs-{pj}-{env}-{targetCode}-sample` |
+
+## クロスアカウントデプロイ
+
+### 前提条件
+
+1. **Pipeline Account**: `cdk bootstrap` 実行済み
+2. **Target Account**: `cdk bootstrap --trust PIPELINE_ACCOUNT_ID` 実行済み
+
+```bash
+# Target Account で実行
+cdk bootstrap aws://TARGET_ACCOUNT_ID/ap-northeast-1 \
+  --trust PIPELINE_ACCOUNT_ID \
+  --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess
+```
+
+### KMS キーの自動作成
+
+クロスアカウント時は Artifact Bucket に KMS 暗号化が必要。`isCrossAccount` フラグに基づき自動的に KMS キーを作成する。
 
 ## Error Handling
 
-### Parameter Store 取得エラー
+| エラーケース | 原因 | 対応 |
+|-------------|------|------|
+| `Artifact Bucket must have a KMS Key` | クロスアカウントで S3_MANAGED 暗号化を使用 | KMS キーを作成（自動対応済み） |
+| `ssm:GetParameter not authorized` | CodeBuild に SSM 権限がない | 環境変数で TARGET_ACCOUNT_ID を渡す（自動対応済み） |
+| `cdk bootstrap` エラー | Target Account で trust 未設定 | `--trust` オプションで bootstrap |
+| `valueFromLookup` がダミー値を返す | Parameter Store にパラメータが存在しない | CFn で事前作成 |
 
-| エラーケース | 対応 |
-|---|---|
-| パラメータが存在しない | CDK synth 時に `valueFromLookup` が `dummy-value-for-*` を返す。実際のデプロイ時にエラーとなり中断 |
-| 権限不足 | IAM ポリシーエラーとして CDK CLI がエラーメッセージを表示 |
-| パラメータ値が不正（空文字等） | CDK の `env` に空文字が設定され、スタックデプロイ時に CloudFormation がエラーを報告 |
+## セキュリティ考慮事項
 
-### デプロイエラー
+### Git に含めないファイル
 
-| エラーケース | 対応 |
-|---|---|
-| クロスアカウント権限不足 | CDK Pipelines の bootstrap 未実行を示唆するエラーメッセージが表示される。Target_Account で `cdk bootstrap --trust PIPELINE_ACCOUNT_ID` の実行が必要 |
-| 大阪リージョンの bootstrap 未実行 | Target_Account の ap-northeast-3 でも `cdk bootstrap` が必要 |
-| S3 Source Bucket が空 | パイプラインが起動しない（トリガーが発火しない） |
-| Synth Step 失敗 | パイプライン実行が Synth ステージで失敗。CodeBuild ログでエラー内容を確認 |
-| 東京デプロイ成功・大阪デプロイ失敗 | パイプラインはステージ全体を失敗として扱う。大阪リージョンの権限・bootstrap を確認 |
+`.gitignore` で以下を除外:
+- `cdk.context.json` - アカウント ID がキャッシュされる
+- `cdk.out/` - synth 出力
 
-### Direct_Deploy エラー
+### 機密情報の管理
 
-| エラーケース | 対応 |
-|---|---|
-| Target_Account への認証情報なし | AWS CLI/SDK がエラーを報告。`--profile` オプションまたは環境変数の設定が必要 |
-| 大阪リージョンへのデプロイ権限なし | Target_Account の大阪リージョンに対する IAM 権限を確認 |
+- アカウント ID は Parameter Store から動的取得
+- コードにハードコードしない
+- 環境変数で渡す場合も Git にコミットしない

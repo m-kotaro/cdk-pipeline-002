@@ -1,4 +1,5 @@
 import * as cdk from "aws-cdk-lib";
+import { Construct } from "constructs";
 import { TokyoResourceStack } from "./stack-resource-tokyo";
 import { projectName } from "../../pipeline/env";
 
@@ -8,7 +9,7 @@ export interface DeployProps {
   accountCode: string;
 }
 
-export function deployTokyo(scope: cdk.Stage, props: DeployProps): void {
+export function deployTokyo(scope: Construct, props: DeployProps): void {
   new TokyoResourceStack(scope, `stack-${projectName}-${props.envName}-${props.accountCode}-tokyo`, {
     env: props.env,
     envName: props.envName,

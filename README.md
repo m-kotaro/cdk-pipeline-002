@@ -105,21 +105,6 @@ cfn/
 | `PROJECT_NAME` | Project name | cp002 | cp002 |
 | `DEPLOY_ENV` | Environment code | dev | dev, prd |
 | `DEPLOY_REGION` | Region name | tokyo | tokyo, osaka |
-| `CDK_DEFAULT_ACCOUNT` | AWS Account ID | - | 687848809039 |
+| `CDK_DEFAULT_ACCOUNT` | AWS Account ID | - | 123456789012 |
 | `PIPELINE_ACCOUNT_CODE` | Pipeline account code (free-form) | base | base, main |
 | `TARGET_ACCOUNT_CODE` | Target account code (free-form) | alfa | alfa, beta, gamma |
-
-## Naming Convention
-
-リソース名にアカウントコードを含めることで、マルチアカウント環境でも識別しやすくなる。
-
-| Resource Type | Pattern | Example |
-|---------------|---------|---------|
-| Pipeline Stack | `stack-{pj}-{env}-{pipelineCode}-{region}-pipeline` | `stack-cp002-dev-base-tokyo-pipeline` |
-| CodePipeline | `cp-{pj}-{env}-{pipelineCode}-{region}-deploy` | `cp-cp002-dev-base-tokyo-deploy` |
-| Source Bucket | `s3-{pj}-{env}-{pipelineCode}-{region}-source` | `s3-cp002-dev-base-tokyo-source` |
-| Artifact Bucket | `s3-{pj}-{env}-{pipelineCode}-{region}-artifact` | `s3-cp002-dev-base-tokyo-artifact` |
-| Resource Stack | `stack-{pj}-{env}-{targetCode}-{region}` | `stack-cp002-dev-alfa-tokyo` |
-| Sample S3 | `s3-{pj}-{env}-{targetCode}-sample` | `s3-cp002-dev-alfa-sample` |
-| Sample SQS | `sqs-{pj}-{env}-{targetCode}-sample` | `sqs-cp002-dev-alfa-sample` |
-| DR S3 | `s3-{pj}-{env}-{targetCode}-dr` | `s3-cp002-dev-alfa-dr` |

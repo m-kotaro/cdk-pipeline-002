@@ -1,35 +1,25 @@
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib";
-import { TokyoResourceStack } from "../lib/resources/tokyo/stack-resource-tokyo";
-import { OsakaResourceStack } from "../lib/resources/osaka/stack-resource-osaka";
-import { projectName, deployEnv, deployRegion, awsRegion, cdkDefaultAccount, targetAccountCode } from "../lib/pipeline/env";
+import { deployTokyo } from "../lib/resources/tokyo/deploy-tokyo";
+import { deployOsaka } from "../lib/resources/osaka/deploy-osaka";
+import { deployEnv, deployRegion, awsRegion, cdkDefaultAccount, targetAccountCode } from "../lib/pipeline/env";
 
 const app = new cdk.App();
 
 // Direct deploy では CDK_DEFAULT_ACCOUNT をターゲットアカウントとして使用
-const targetAccountId = cdkDefaultAccount;
+const deployProps = {
+  env: {
+    account: cdkDefaultAccount,
+    region: awsRegion,
+  },
+  envName: deployEnv,
+  accountCode: targetAccountCode,
+};
 
-// リージョン名に応じたスタックをデプロイ
 if (deployRegion === "tokyo") {
-  new TokyoResourceStack(app, `stack-${projectName}-${deployEnv}-${targetAccountCode}-tokyo`, {
-    env: {
-      account: targetAccountId,
-      region: awsRegion,
-    },
-    envName: deployEnv,
-    accountCode: targetAccountCode,
-    stackName: `stack-${projectName}-${deployEnv}-${targetAccountCode}-tokyo`,
-  });
+  deployTokyo(app, deployProps);
 } else if (deployRegion === "osaka") {
-  new OsakaResourceStack(app, `stack-${projectName}-${deployEnv}-${targetAccountCode}-osaka`, {
-    env: {
-      account: targetAccountId,
-      region: awsRegion,
-    },
-    envName: deployEnv,
-    accountCode: targetAccountCode,
-    stackName: `stack-${projectName}-${deployEnv}-${targetAccountCode}-osaka`,
-  });
+  deployOsaka(app, deployProps);
 }
 
 app.synth();

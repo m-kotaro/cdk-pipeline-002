@@ -1,6 +1,35 @@
 # Change Log
 
-Spec ドキュメント（requirements.md, design.md, tasks.md）はまだ古い状態。以下の変更を追って反映する必要がある。
+## 2026-07-06: アカウントコード追加 & クロスアカウント対応完了
+
+### アカウントコードの追加
+- **新規環境変数**: `PIPELINE_ACCOUNT_CODE`, `TARGET_ACCOUNT_CODE`
+- マルチアカウント環境でリソースを識別しやすくするため
+- 命名規則: `stack-{pj}-{env}-{accountCode}-{region}-xxx`
+
+### クロスアカウントデプロイ対応
+- KMS キーの自動作成（クロスアカウント時のみ）
+- `isCrossAccount` フラグで同一アカウント/クロスアカウントを判定
+- Artifact Bucket の暗号化を KMS に変更（クロスアカウント時）
+
+### CodeBuild での SSM 参照問題の解決
+- 環境変数 `TARGET_ACCOUNT_ID` を Synth Step で渡す
+- CodeBuild 内で再度 SSM を参照しないように変更
+- `process.env.TARGET_ACCOUNT_ID || valueFromLookup()` のフォールバック
+
+### デプロイ関数の共通化
+- `deploy-tokyo.ts`, `deploy-osaka.ts` を各リージョンフォルダに配置
+- `direct-app.ts` と `stage-app.ts` で同じ関数を使用
+- scope の型を `Construct` に変更して App/Stage 両方で使えるように
+
+### cdk.context.json の除外
+- `.gitignore` に追加
+- アカウント ID がキャッシュされる問題を回避
+
+### Spec ドキュメント更新
+- [x] design.md を最終実装に合わせて書き直し
+
+---
 
 ## 2026-07-05: Architecture Simplification
 
@@ -21,13 +50,13 @@ Spec ドキュメント（requirements.md, design.md, tasks.md）はまだ古い
 
 ### リージョン名を命名規則に追加
 - **Before**: `stack-cp002-dev-pipeline`, `s3-cp002-dev-source`
-- **After**: `stack-cp002-dev-tokyo-pipeline`, `s3-cp002-dev-tokyo-source`
+- **After**: `stack-cp002-dev-base-tokyo-pipeline`, `s3-cp002-dev-base-tokyo-source`
 - `DEPLOY_REGION` に `tokyo` or `osaka` を指定
 
 ### クロスリージョンデプロイ廃止
-- **Before**: 1パイプライン内で東京＋大阪の両リージョンにデプロイ（CDK Pipelines のクロスリージョンサポートスタック自動作成）
-- **After**: パイプラインは東京のみ。大阪は Direct Deploy で手動管理
-- 理由: クロスリージョンだとサポートスタック（レプリケーションバケット）が自動作成され、大阪リージョンの bootstrap が必要になる等、複雑化するため
+- **Before**: 1パイプライン内で東京＋大阪の両リージョンにデプロイ
+- **After**: パイプラインはリージョン単位。大阪は別パイプラインまたは Direct Deploy
+- 理由: クロスリージョンだとサポートスタックが自動作成され複雑化するため
 
 ### AppStage の変更
 - **Before**: Tokyo_Stack + Osaka_Stack の両方をインスタンス化
@@ -35,33 +64,20 @@ Spec ドキュメント（requirements.md, design.md, tasks.md）はまだ古い
 
 ### S3 ソースバケットの管理
 - **Before**: CDK 内で S3 バケットを作成
-- **After**: CFn テンプレート（`cfn/pipeline-buckets.yaml`）で事前作成し、CDK からは `fromBucketName` で参照
-- EventBridge 通知は CFn テンプレート側で有効化
+- **After**: CFn テンプレート（`cfn/pipeline-buckets.yaml`）で事前作成
 
 ### EventBridge トリガー
-- **Before**: `S3Trigger.EVENTS` 指定のみ（CDK が自動でルール作成する想定）
-- **After**: `fromBucketName` だと自動作成されないため、CDK 内で EventBridge Rule を明示的に作成
+- CDK 内で EventBridge Rule を明示的に作成
 - `pipeline.buildPipeline()` を呼んでから `events.Rule` を追加
 
 ### crossAccountKeys の条件分岐
-- **Before**: `crossAccountKeys: true` 固定
-- **After**: `this.account !== targetAccountId` で判定。同一アカウントなら `false`
-- 理由: 同一アカウントで `crossAccountKeys: true` だと KMS キーポリシーエラーが発生する
+- `this.account !== targetAccountId` で判定
+- 同一アカウントなら `false`（KMS キーポリシーエラー回避）
 
-### Parameter Store の簡素化
-- **Before**: `pipeline-account-id`, `target-account-id`, `region` の3パラメータ
-- **After**: `pipeline-account-id`, `target-account-id` の2パラメータのみ
-- `region` は削除（パイプラインがそのリージョンで動くから自明）
+### Parameter Store の構造
+- パス: `/{pj}/{env}/{accountCode}/target-account-id`
+- アカウントコードを含めた階層構造
 
 ### ソースオブジェクトキー
-- `source.zip` → `cdk-pipeline-002-main.zip` に変更
-- Synth Step のパス: `cd cdk-pipeline-002-main/cdk`（zip展開後のフォルダ構造に合わせて）
-
-### SSO 認証の手順
-- `aws sso login` → `eval $(aws configure export-credentials --format env)` で認証情報をエクスポート
-- 再ログイン時は `unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN` が必要
-
-## TODO: Spec ドキュメント更新
-- [ ] requirements.md を最終実装に合わせて書き直す
-- [ ] design.md のアーキテクチャ図・コード例を最終実装に合わせて書き直す
-- [ ] tasks.md を削除または完了マークにする
+- `cdk-pipeline-002-main.zip` に固定
+- Synth Step のパス: `cd cdk-pipeline-002-main/cdk`
