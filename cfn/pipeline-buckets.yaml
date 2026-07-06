@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "S3 Buckets for CodePipeline (source + artifact)"
+Description: "S3 Source Bucket for CodePipeline"
 
 Parameters:
   ProjectName:
@@ -32,20 +32,6 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
-  ArtifactBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub s3-${ProjectName}-${Env}-${RegionName}-artifact
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
-
 Outputs:
   SourceBucketName:
     Description: Source bucket name
@@ -57,13 +43,3 @@ Outputs:
     Value: !GetAtt SourceBucket.Arn
     Export:
       Name: !Sub ${ProjectName}-${Env}-${RegionName}-source-bucket-arn
-  ArtifactBucketName:
-    Description: Artifact bucket name
-    Value: !Ref ArtifactBucket
-    Export:
-      Name: !Sub ${ProjectName}-${Env}-${RegionName}-artifact-bucket-name
-  ArtifactBucketArn:
-    Description: Artifact bucket ARN
-    Value: !GetAtt ArtifactBucket.Arn
-    Export:
-      Name: !Sub ${ProjectName}-${Env}-${RegionName}-artifact-bucket-arn
