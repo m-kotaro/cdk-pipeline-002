@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as kms from "aws-cdk-lib/aws-kms";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
@@ -22,6 +23,8 @@ import {
   artifactBucketName,
   pipelineAccountCode,
   targetAccountCode,
+  sourceObjectKey,
+  sourceExtractDir,
 } from "./env";
 
 export class PipelineStack extends cdk.Stack {
@@ -44,17 +47,29 @@ export class PipelineStack extends cdk.Stack {
       sourceBucketName
     );
 
+    // Artifact Bucket 用の KMS キー（クロスアカウント時に必要）
+    const artifactKey = isCrossAccount
+      ? new kms.Key(this, "ArtifactKey", {
+          alias: `alias/${projectName}-${deployEnv}-${pipelineAccountCode}-artifact`,
+          enableKeyRotation: true,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        })
+      : undefined;
+
     // Artifact Bucket（CDK で作成 - 権限が自動設定される）
     const artifactBucket = new s3.Bucket(this, "ArtifactBucket", {
       bucketName: artifactBucketName,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
+      encryption: isCrossAccount
+        ? s3.BucketEncryption.KMS
+        : s3.BucketEncryption.S3_MANAGED,
+      encryptionKey: artifactKey,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
 
     // S3 ソース（EventBridge トリガー）
-    const source = CodePipelineSource.s3(sourceBucket, "cdk-pipeline-002-main.zip", {
+    const source = CodePipelineSource.s3(sourceBucket, sourceObjectKey, {
       trigger: S3Trigger.EVENTS,
     });
 
@@ -65,13 +80,19 @@ export class PipelineStack extends cdk.Stack {
       artifactBucket: artifactBucket,
       synth: new ShellStep("Synth", {
         input: source,
+        env: {
+          PROJECT_NAME: projectName,
+          DEPLOY_ENV: deployEnv,
+          DEPLOY_REGION: deployRegion,
+          PIPELINE_ACCOUNT_CODE: pipelineAccountCode,
+          TARGET_ACCOUNT_CODE: targetAccountCode,
+        },
         commands: [
-          "cd cdk-pipeline-002-main/cdk",
+          `cd ${sourceExtractDir}/cdk`,
           "npm ci",
-          `export TARGET_ACCOUNT_CODE=${targetAccountCode}`,
           "npx cdk synth",
         ],
-        primaryOutputDirectory: "cdk-pipeline-002-main/cdk/cdk.out",
+        primaryOutputDirectory: `${sourceExtractDir}/cdk/cdk.out`,
       }),
     });
 
@@ -99,7 +120,7 @@ export class PipelineStack extends cdk.Stack {
             name: [sourceBucketName],
           },
           object: {
-            key: ["cdk-pipeline-002-main.zip"],
+            key: [sourceObjectKey],
           },
         },
       },
