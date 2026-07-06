@@ -8,6 +8,9 @@ Parameters:
   Env:
     Type: String
     Description: "Environment code (e.g. dev, stg, prd)"
+  AccountCode:
+    Type: String
+    Description: "Account code (e.g. base, alfa, beta)"
   PipelineAccountId:
     Type: String
     Description: "Pipeline Account ID (account where CDK Pipelines is deployed)"
@@ -19,18 +22,18 @@ Resources:
   PipelineAccountIdParameter:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: !Sub /${ProjectName}/${Env}/pipeline-account-id
+      Name: !Sub /${ProjectName}/${Env}/${AccountCode}/pipeline-account-id
       Type: String
       Value: !Ref PipelineAccountId
-      Description: !Sub "Pipeline account ID for ${Env} environment"
+      Description: !Sub "Pipeline account ID for ${Env}/${AccountCode} environment"
 
   TargetAccountIdParameter:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: !Sub /${ProjectName}/${Env}/target-account-id
+      Name: !Sub /${ProjectName}/${Env}/${AccountCode}/target-account-id
       Type: String
       Value: !Ref TargetAccountId
-      Description: !Sub "Target account ID for ${Env} environment"
+      Description: !Sub "Target account ID for ${Env}/${AccountCode} environment"
 
 Outputs:
   PipelineAccountIdParameterName:

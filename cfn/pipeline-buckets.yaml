@@ -8,6 +8,9 @@ Parameters:
   Env:
     Type: String
     Description: "Environment code (e.g. dev, stg, prd)"
+  AccountCode:
+    Type: String
+    Description: "Account code (e.g. base, alfa, beta)"
   RegionName:
     Type: String
     Description: "Region name (e.g. tokyo, osaka)"
@@ -16,7 +19,7 @@ Resources:
   SourceBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub s3-${ProjectName}-${Env}-${RegionName}-source
+      BucketName: !Sub s3-${ProjectName}-${Env}-${AccountCode}-${RegionName}-source
       VersioningConfiguration:
         Status: Enabled
       NotificationConfiguration:
@@ -37,9 +40,9 @@ Outputs:
     Description: Source bucket name
     Value: !Ref SourceBucket
     Export:
-      Name: !Sub ${ProjectName}-${Env}-${RegionName}-source-bucket-name
+      Name: !Sub ${ProjectName}-${Env}-${AccountCode}-${RegionName}-source-bucket-name
   SourceBucketArn:
     Description: Source bucket ARN
     Value: !GetAtt SourceBucket.Arn
     Export:
-      Name: !Sub ${ProjectName}-${Env}-${RegionName}-source-bucket-arn
+      Name: !Sub ${ProjectName}-${Env}-${AccountCode}-${RegionName}-source-bucket-arn
