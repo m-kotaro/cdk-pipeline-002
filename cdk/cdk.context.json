@@ -1,6 +1,0 @@
-{
-  "ssm:account=687848809039:parameterName=/cp002/dev/target-account-id:region=ap-northeast-1": "687848809039",
-  "ssm:account=687848809039:parameterName=/cp002/dev/region:region=ap-northeast-1": "ap-northeast-1",
-  "ssm:account=687848809039:parameterName=/cp002/dev/base/target-account-id:region=ap-northeast-1": "687848809039",
-  "ssm:account=553906651027:parameterName=/cp002/prd/base/target-account-id:region=ap-northeast-1": "116261339105"
-}
