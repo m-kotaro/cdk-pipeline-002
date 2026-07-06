@@ -42,12 +42,14 @@ export class PipelineStack extends cdk.Stack {
       sourceBucketName
     );
 
-    // Artifact Bucket を既存バケットとして参照
-    const artifactBucket = s3.Bucket.fromBucketName(
-      this,
-      "ArtifactBucket",
-      artifactBucketName
-    );
+    // Artifact Bucket（CDK で作成 - 権限が自動設定される）
+    const artifactBucket = new s3.Bucket(this, "ArtifactBucket", {
+      bucketName: artifactBucketName,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    });
 
     // S3 ソース（EventBridge トリガー）
     const source = CodePipelineSource.s3(sourceBucket, "cdk-pipeline-002-main.zip", {
