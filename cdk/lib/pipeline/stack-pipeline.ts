@@ -86,6 +86,7 @@ export class PipelineStack extends cdk.Stack {
           DEPLOY_REGION: deployRegion,
           PIPELINE_ACCOUNT_CODE: pipelineAccountCode,
           TARGET_ACCOUNT_CODE: targetAccountCode,
+          TARGET_ACCOUNT_ID: targetAccountId,
         },
         commands: [
           `cd ${sourceExtractDir}/cdk`,
