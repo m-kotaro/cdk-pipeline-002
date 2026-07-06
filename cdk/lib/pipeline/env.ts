@@ -19,5 +19,5 @@ export const targetAccountCode = process.env.TARGET_ACCOUNT_CODE || "alfa";
 export const ssmPrefix = `/${projectName}/${deployEnv}/${pipelineAccountCode}`;
 export const sourceBucketName = `s3-${projectName}-${deployEnv}-${pipelineAccountCode}-${deployRegion}-source`;
 export const artifactBucketName = `s3-${projectName}-${deployEnv}-${pipelineAccountCode}-${deployRegion}-artifact`;
-export const sourceObjectKey = `${projectName}-source-main.zip`;
-export const sourceExtractDir = `${projectName}-source`;
+export const sourceObjectKey = "cdk-pipeline-002-source-main.zip";
+export const sourceExtractDir = "cdk-pipeline-002-source-main";
